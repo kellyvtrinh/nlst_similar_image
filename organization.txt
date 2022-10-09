@@ -5,6 +5,8 @@
 
  
 3. A file to define the loss function.
-4. A file to define some CNN or encoder. 
+4. A file to define some CNN or encoder.
+
+- I need some dummy auto-encoder.  
 5. A file for training loops to have everything placed together.
 

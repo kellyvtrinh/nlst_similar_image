@@ -116,7 +116,7 @@ def shorten_paths(path):
     reformated_paths = "/".join(path.split("/")[9:])
     return reformated_paths
 
-def display_scans(data_loc, test_ids):
+def load_scans(data_loc, test_ids, display=False):
     '''
     Parameters:
         data_loc: The location of the csv file containing locations of a datafile. 
@@ -142,18 +142,21 @@ def display_scans(data_loc, test_ids):
 
     SLICE_NUMBER = 50
 
+
     x, y = next(iter(dataloader))
 
-    for i in range(len(y)):
-        ax[i].imshow(x[i][SLICE_NUMBER], cmap="gray")
-        ax[i].set_title(f"Patient id {y[i]}, slice index {i}")
-        ax[i].set_xlim(0, 220)
-        ax[i].set_ylim(0, 220)
+    if display:
+        for i in range(len(y)):
+            ax[i].imshow(x[i][SLICE_NUMBER], cmap="gray")
+            ax[i].set_title(f"Patient id {y[i]}, slice index {i}")
+            ax[i].set_xlim(0, 220)
+            ax[i].set_ylim(0, 220)
 
-    plt.tight_layout()
-    plt.show()
+        plt.tight_layout()
+        plt.show()
 
+    return x, y
 
 if __name__ == "__main__":
-    display_scans(data_loc="Data/NLST_selected_image_folders_metadata_rerun.csv", 
-    test_ids=[100002, 100004, 111098])
+    load_scans(data_loc="Data/NLST_selected_image_folders_metadata_rerun.csv", 
+    test_ids=[100002, 100004, 111098], display=True)
