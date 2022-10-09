@@ -1,0 +1,10 @@
+1. A file to load in data and preprocess the images into numpy arrays. 
+2. A file to define batch samplers, datasets, and dataloaders.
+
+- Make sure to add random seed into batch sampler.
+
+ 
+3. A file to define the loss function.
+4. A file to define some CNN or encoder. 
+5. A file for training loops to have everything placed together.
+
