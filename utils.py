@@ -1,5 +1,3 @@
-from hashlib import sha1
-from turtle import shape
 import numpy as np
 import pandas as pd 
 pd.options.mode.chained_assignment = None  # default='warn'
@@ -31,11 +29,22 @@ def pdist(vectors):
     return -2 * vectors.mm(torch.t(vectors)) + vectors.pow(2).sum(dim=1).view(1, -1) + vectors.pow(2).sum(dim=1).view(-1, 1)
 
 
+def pick_hardest(self, loss_values):
+    return [np.argmax(loss_values)]
+
+def pick_randomly(self, loss_values):
+    idx = np.random.choice(np.arange(len(loss_values)), 1)
+    return [idx]
+
+def pick_all(self, loss_values):
+    return list[np.range(len(loss_values))]
+
+
 # Hard negatives: all, random, hardest
 # Semi-hard negatives: all, random, hardest
 # All negatives
 
-class NegativesSelectors:
+class NegativesSelectors(TripletSelector):
 
     def __init__(self, margin, negative_selection_fn, selection_criteria):
         ''' 
@@ -49,22 +58,14 @@ class NegativesSelectors:
         self.negative_selection_fn = negative_selection_fn
         self.selection_criteria = selection_criteria
 
+    @staticmethod
     def return_all_negatives(self, embeddings, labels):
 
         ''' 
         '''
         pass
 
-    def pick_hardest(self, loss_values):
-        return [np.argmax(loss_values)]
-
-    def pick_randomly(self, loss_values):
-        idx = np.random.choice(np.arange(len(loss_values)), 1)
-        return [idx]
-
-    def pick_all(self, loss_values):
-        return list[np.range(len(loss_values))]
-
+    @staticmethod
     def hard_negatives(self, curr_positive_dist, all_negative_dist, selection_criteria):
         ''' 
         A hard negative is where d(a, p) > d(a, n).
@@ -85,6 +86,7 @@ class NegativesSelectors:
         possible_hard_negatives = np.where(curr_positive_dist - all_negative_dist > 0)[0]
         return selection_criteria(possible_hard_negatives)
 
+    @staticmethod
     def semi_hard_negatives(self, curr_positive_dist, all_negative_dist, selection_criteria):
         ''' 
         A semi-hard negative is where d(a, p) < d(a, n) < d(a, p) + margin.
@@ -104,7 +106,7 @@ class NegativesSelectors:
         return selection_criteria(possible_semi_hard_negatives)
 
     
-    def get_hard_semihard_triplets(self, embeddings, labels):
+    def get_triplets(self, embeddings, labels):
 
         # find pairwise distances
         distance_matrix = pdist(embeddings).numpy()
@@ -152,5 +154,5 @@ class NegativesSelectors:
         return triplets
 
     
-
+# testing out triplet selectors 
 
