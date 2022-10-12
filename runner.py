@@ -26,17 +26,20 @@ def debug_triplet_selector():
     hard_negative = selectors.hard_negatives 
     semi_hard_negative = selectors.semi_hard_negatives
 
-    hard_selector = selectors(margin=margin, negative_selection_fn=pick_hardest, selection_criteria=hard_negative)
-    semi_hard_selector = selectors(margin=margin, negative_selection_fn=pick_all, selection_criteria=semi_hard_negative)
+    hard_selector = selectors(margin=margin, negative_selection_fn=hard_negative, selection_criteria=pick_hardest)
+    semi_hard_selector = selectors(margin=margin, negative_selection_fn=semi_hard_negative, selection_criteria=pick_all)
 
     x, y = load_scans(data_loc="Data/NLST_selected_image_folders_metadata_rerun.csv", 
-        test_ids=[100002, 100004, 111098])
+        test_ids=[100002, 100004, 111098], n_patients=2)
+
 
     encoder = EmbeddingNet()
+    encoder = encoder.double()
     embeddings = encoder(x)
 
     triplets = hard_selector.get_triplets(embeddings=embeddings, labels=y)
     return triplets
 
 if __name__ == "__main__":
-    print("Here are the triplet outputs", debug_triplet_selector())
+    triplets = debug_triplet_selector()
+    print("Here are the triplet outputs", triplets)

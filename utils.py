@@ -29,14 +29,14 @@ def pdist(vectors):
     return -2 * vectors.mm(torch.t(vectors)) + vectors.pow(2).sum(dim=1).view(1, -1) + vectors.pow(2).sum(dim=1).view(-1, 1)
 
 
-def pick_hardest(self, loss_values):
+def pick_hardest(loss_values):
     return [np.argmax(loss_values)]
 
-def pick_randomly(self, loss_values):
+def pick_randomly(loss_values):
     idx = np.random.choice(np.arange(len(loss_values)), 1)
     return [idx]
 
-def pick_all(self, loss_values):
+def pick_all(loss_values):
     return list[np.range(len(loss_values))]
 
 
@@ -66,7 +66,7 @@ class NegativesSelectors(TripletSelector):
         pass
 
     @staticmethod
-    def hard_negatives(self, curr_positive_dist, all_negative_dist, selection_criteria):
+    def hard_negatives(curr_positive_dist, all_negative_dist, selection_criteria):
         ''' 
         A hard negative is where d(a, p) > d(a, n).
         For one single pair of anchor and its positive (a, p), 
@@ -82,12 +82,15 @@ class NegativesSelectors(TripletSelector):
         '''
         # loss = d(a, p) - d(a, n) + margin
         # hard negatives meant that d(a, n) < d(a, p) and d(a, p) - d(a, n) = loss - margin > 0
-        
+
+        print("I am in line 86 in utils.py")
+
         possible_hard_negatives = np.where(curr_positive_dist - all_negative_dist > 0)[0]
+        print("I am in line 87 in utils.py")
         return selection_criteria(possible_hard_negatives)
 
     @staticmethod
-    def semi_hard_negatives(self, curr_positive_dist, all_negative_dist, selection_criteria):
+    def semi_hard_negatives(curr_positive_dist, all_negative_dist, selection_criteria):
         ''' 
         A semi-hard negative is where d(a, p) < d(a, n) < d(a, p) + margin.
         For one single pair of anchor and its positive (a, p), 
@@ -109,7 +112,7 @@ class NegativesSelectors(TripletSelector):
     def get_triplets(self, embeddings, labels):
 
         # find pairwise distances
-        distance_matrix = pdist(embeddings).numpy()
+        distance_matrix = pdist(embeddings).detach().numpy()
         
         # all patient ids 
         all_patient_ids = set(labels)
@@ -118,24 +121,30 @@ class NegativesSelectors(TripletSelector):
         # positive_idx[i] = a list of indices of scans belonging to the ith patient
         positive_idx = np.array([np.where(labels == id)[0] for id in all_patient_ids])
         # negative_idx[i] = a list of indices of scans that do not belong to the ith patient
-        negative_idx = np.array([np.where(np.logical_not(self.patient_ids == id))[0] for id in all_patient_ids])
+        negative_idx = np.array([np.where(np.logical_not(labels == id))[0] for id in all_patient_ids])
 
         # for example, positive_idx = [[1, 2, 3], [4, 5, 6]]
         # positive_pairings = [   [(1, 2), (1, 3), (2, 3)]  ,  [(4, 5), (4, 6), (5, 6)]    ]
-        positive_pairings = [list(combinations(positive_idx[i], 2)) for i in range(n_patients)]
+        positive_pairings = np.array([list(combinations(positive_idx[i], 2)) for i in range(n_patients)])
         # positive_pairings = pos_pairs.reshape(pos_pairs.shape[0] * pos_pairs.shape[1], pos_pairs.shape[2])
 
         # ap_distances[j] = distance between the jth (a, p) pairing, with a = anchor, p = positive pairing
-        ap_distances = distance_matrix[positive_pairings[:, :, 0], positive_idx[:, :, 1]]
+        # (1, 2), (2, 3), (1, 3)
+        ap_distances = distance_matrix[positive_pairings[:, :, 0], positive_pairings[:, :, 1]]
+
 
         triplets = []
 
-        scan_no = 0
+        print("n_patients", n_patients)
         for patient in range(n_patients):
-            for pairings in positive_pairings[patient]:
+            for i, pairings in enumerate(positive_pairings[patient]):
+
+                print("pairings", pairings)
+                print("patient", patient)
                 
                 # d(a, p)
-                curr_positive_dist = ap_distances[scan_no] 
+                curr_positive_dist = ap_distances[positive_pairings[patient, i, 0], positive_pairings[patient, i, 1]] 
+
 
                 # a list of different d(a, n) for all n (negative example) for the current a (anchor)
                 all_negative_dist = distance_matrix[pairings[0], negative_idx[patient]]
