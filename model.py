@@ -1,4 +1,4 @@
-
+import torch
 import torchvision.models as models
 from torch.autograd import Variable
 import torch.nn as nn
@@ -25,24 +25,30 @@ class EmbeddingNet(nn.Module):
 # torch.nn.Linear(in_features, out_features, bias=True, device=None, dtype=None)
 
 
+#  input size (N, C_{in}, D, H, W)
+# N = number of examples 
+# 
     def __init__(self):
         super(EmbeddingNet, self).__init__()
-        self.convnet = nn.Sequential(nn.Conv3d(1, 32, 5), nn.PReLU(),
-                                     nn.MaxPool3d(2, stride=2),
-                                      nn.Conv3d(32, 64, 5), nn.PReLU(),
-                                      nn.MaxPool3d(2, stride=2)) 
+        self.convnet = nn.Sequential(nn.Conv3d(1, 5, 5), nn.PReLU())
+                                    #  nn.MaxPool3d(2, stride=2))
+                                    #   nn.Conv3d(32, 64, 5), nn.PReLU(),
+                                    #   nn.MaxPool3d(2, stride=2)) 
 
-        self.fc = nn.Sequential(nn.Linear(64 * 22 * 51 * 51, 256), # something is wrong with this dimension 
+        self.fc = nn.Sequential(nn.Linear(64 * 22 * 51 * 51, 256), 
                                 nn.PReLU(),
                                 nn.Linear(256, 256),
                                 nn.PReLU(),
                                 nn.Linear(256, 64) 
                                 )
 
+    #@torch.autocast(device_type='cpu', dtype=torch.double)
     def forward(self, x):
-        output = self.convnet(x)
+        
+        x = torch.unsqueeze(x, 1)
+        output = self.convnet(Variable(x.type(torch.double))) # something is wrong here
         output = output.view(output.size()[0], -1)
-        output = self.fc(output)
+        #output = self.fc(output)
         return output
 
     def get_embedding(self, x):

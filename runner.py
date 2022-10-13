@@ -37,7 +37,9 @@ def debug_triplet_selector():
     encoder = encoder.double()
     embeddings = encoder(x)
 
-    triplets = hard_selector.get_triplets(embeddings=embeddings, labels=y)
+
+    #triplets = hard_selector.get_triplets(embeddings=embeddings, labels=y)
+    triplets = semi_hard_selector.get_triplets(embeddings=embeddings, labels=y)
     return triplets
 
 if __name__ == "__main__":

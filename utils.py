@@ -1,3 +1,4 @@
+from turtle import distance
 import numpy as np
 import pandas as pd 
 pd.options.mode.chained_assignment = None  # default='warn'
@@ -28,6 +29,7 @@ def pdist(vectors):
     '''
     return -2 * vectors.mm(torch.t(vectors)) + vectors.pow(2).sum(dim=1).view(1, -1) + vectors.pow(2).sum(dim=1).view(-1, 1)
 
+# change this to be loss values and a list of booleans...
 
 def pick_hardest(loss_values):
     return [np.argmax(loss_values)]
@@ -37,7 +39,7 @@ def pick_randomly(loss_values):
     return [idx]
 
 def pick_all(loss_values):
-    return list[np.range(len(loss_values))]
+    return list(np.arange(len(loss_values)))
 
 
 # Hard negatives: all, random, hardest
@@ -66,7 +68,7 @@ class NegativesSelectors(TripletSelector):
         pass
 
     @staticmethod
-    def hard_negatives(curr_positive_dist, all_negative_dist, selection_criteria):
+    def hard_negatives(curr_positive_dist, all_negative_dist, selection_criteria, margin):
         ''' 
         A hard negative is where d(a, p) > d(a, n).
         For one single pair of anchor and its positive (a, p), 
@@ -82,15 +84,11 @@ class NegativesSelectors(TripletSelector):
         '''
         # loss = d(a, p) - d(a, n) + margin
         # hard negatives meant that d(a, n) < d(a, p) and d(a, p) - d(a, n) = loss - margin > 0
-
-        print("I am in line 86 in utils.py")
-
-        possible_hard_negatives = np.where(curr_positive_dist - all_negative_dist > 0)[0]
-        print("I am in line 87 in utils.py")
-        return selection_criteria(possible_hard_negatives)
+        possible_hard_negatives = np.where(curr_positive_dist - all_negative_dist > 0)[0] # what happens when there's no values like that 
+        return selection_criteria(possible_hard_negatives) if len(possible_hard_negatives) > 0 else None
 
     @staticmethod
-    def semi_hard_negatives(curr_positive_dist, all_negative_dist, selection_criteria):
+    def semi_hard_negatives(curr_positive_dist, all_negative_dist, selection_criteria, margin):
         ''' 
         A semi-hard negative is where d(a, p) < d(a, n) < d(a, p) + margin.
         For one single pair of anchor and its positive (a, p), 
@@ -104,18 +102,23 @@ class NegativesSelectors(TripletSelector):
                                 If selection criteria is pick_hardest or pick_randomly, return a list of one item. 
         '''
 
-        condition = (curr_positive_dist > all_negative_dist & curr_positive_dist + self.margin > all_negative_dist)
-        possible_semi_hard_negatives = np.where(condition)
-        return selection_criteria(possible_semi_hard_negatives)
-
+        possible_semi_hard_negatives = np.logical_and(curr_positive_dist < all_negative_dist, curr_positive_dist + margin > all_negative_dist)
+        print("possible_semi_hard_negatives", possible_semi_hard_negatives)
+        return selection_criteria(possible_semi_hard_negatives) if len(possible_semi_hard_negatives) > 0 else None
+ 
     
     def get_triplets(self, embeddings, labels):
 
         # find pairwise distances
         distance_matrix = pdist(embeddings).detach().numpy()
+        labels = labels.numpy()
+
+        print("labels", labels)
+        
         
         # all patient ids 
         all_patient_ids = set(labels)
+        print("all patient ids", all_patient_ids)
         n_patients = len(all_patient_ids)
 
         # positive_idx[i] = a list of indices of scans belonging to the ith patient
@@ -128,33 +131,37 @@ class NegativesSelectors(TripletSelector):
         positive_pairings = np.array([list(combinations(positive_idx[i], 2)) for i in range(n_patients)])
         # positive_pairings = pos_pairs.reshape(pos_pairs.shape[0] * pos_pairs.shape[1], pos_pairs.shape[2])
 
-        # ap_distances[j] = distance between the jth (a, p) pairing, with a = anchor, p = positive pairing
-        # (1, 2), (2, 3), (1, 3)
-        ap_distances = distance_matrix[positive_pairings[:, :, 0], positive_pairings[:, :, 1]]
-
-
         triplets = []
 
-        print("n_patients", n_patients)
+        print("positive_pairings", positive_pairings)
+        print("number of patients", n_patients)
+        print("positive_idx", positive_idx)
+
         for patient in range(n_patients):
             for i, pairings in enumerate(positive_pairings[patient]):
 
-                print("pairings", pairings)
-                print("patient", patient)
-                
                 # d(a, p)
-                curr_positive_dist = ap_distances[positive_pairings[patient, i, 0], positive_pairings[patient, i, 1]] 
+                # curr_positive_dist = ap_distances[positive_pairings[patient, i, 0], positive_pairings[patient, i, 1]] 
+                curr_positive_dist = distance_matrix[positive_pairings[patient, i, 0], positive_pairings[patient, i, 1]]
 
 
                 # a list of different d(a, n) for all n (negative example) for the current a (anchor)
-                all_negative_dist = distance_matrix[pairings[0], negative_idx[patient]]
+                all_negative_dist = distance_matrix[pairings[0], negative_idx[patient]] # slicing [anchor, all the negatives of the patient]
+                
                 # indices of negative pairs that suit whichever method of negative pair selection
-                valid_negatives = self.negative_selection_fn(curr_positive_dist, all_negative_dist, self.selection_criteria)
-            
+                valid_negatives = self.negative_selection_fn(curr_positive_dist, all_negative_dist, self.selection_criteria, self.margin)
+
+                
                 if valid_negatives is not None:
 
-                    selected_negative_idx = negative_idx[valid_negatives]
-                    triplets.extend([[positive_pairings[0], positive_pairings[1], idx] for idx in selected_negative_idx])
+                    selected_negative_idx = negative_idx[patient][valid_negatives]
+                    print("selected negative", selected_negative_idx)
+                    print("pairings", pairings)
+
+                    # incorrect
+                    triplets.extend([[pairings[0], pairings[1], idx] for idx in selected_negative_idx])
+                else:
+                    print("None", pairings, patient)
         
         if len(triplets) == 0:
             # TODO: figure out what to do if there are no negatives that meet the criteria
